@@ -37,6 +37,16 @@ Any computer or device UpSnap can wake (Wake-on-LAN) and check (ping or a custom
 command). Turning off needs a shutdown command in UpSnap; sleeping needs
 [Sleep-on-LAN](https://github.com/SR-G/sleep-on-lan) on the device.
 
+## UpSnap or the built-in Wake on LAN integration?
+
+Home Assistant's [Wake on LAN](https://www.home-assistant.io/integrations/wake_on_lan/)
+integration sends the magic packet itself; turning computers off needs scripts of your
+own, and their state needs a ping check you set up in Home Assistant. This integration
+is for people who manage their computers in UpSnap: it uses UpSnap's devices, wake and
+shutdown commands, Sleep-on-LAN, ping checks and user permissions, so nothing has to be
+configured twice, and actions started from UpSnap (web UI or its scheduled wake and
+shutdown) show up in Home Assistant too.
+
 ## Requirements
 
 - UpSnap 4.x or 5.x (tested with 4.x).
@@ -46,19 +56,20 @@ command). Turning off needs a shutdown command in UpSnap; sleeping needs
 
 ### Home Assistant 2026.11 or newer (Marketplace)
 
-[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pmelero&repository=ha-upsnap&category=integration)
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pmelero&repository=ha-upsnap&category=integration)
 
-Or manually:
+1. **Settings → Marketplace**, search for **UpSnap** and install it.
+2. Restart Home Assistant.
 
-1. **Settings → Marketplace**, then **Add from link** in the upper-right corner.
-2. Enter `https://github.com/pmelero/ha-upsnap` and select **Add**.
-3. Install **UpSnap** and restart Home Assistant.
+If UpSnap does not show up in the search, add the repository yourself: **Add from
+link** in the upper-right corner of the Marketplace, enter
+`https://github.com/pmelero/ha-upsnap` and install it.
 
 ### Home Assistant 2026.10 or older (HACS)
 
-1. HACS → ⋮ → **Custom repositories**.
-2. Add `https://github.com/pmelero/ha-upsnap` with type **Integration**.
-3. Install **UpSnap** and restart Home Assistant.
+1. In HACS, search for **UpSnap**, download it and restart Home Assistant.
+2. If it does not show up: ⋮ → **Custom repositories**, add
+   `https://github.com/pmelero/ha-upsnap` with type **Integration**, then download it.
 
 ### Manual
 
