@@ -1,0 +1,108 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to UpSnap",
+        "description": "Use an UpSnap user with the **Read** and **Power** permissions on the devices you want to control. The UpSnap admin account also works.",
+        "data": {
+          "url": "URL",
+          "username": "Username or email",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "Address of the UpSnap web interface, for example http://192.168.1.10:8090"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with UpSnap",
+        "description": "UpSnap at {url} rejected the saved credentials.",
+        "data": {
+          "username": "Username or email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to UpSnap.",
+      "invalid_auth": "Invalid username or password.",
+      "invalid_url": "The URL must start with http:// or https://.",
+      "no_devices": "This user cannot see any device. Give it the Read permission on your devices in UpSnap.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This UpSnap server is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "UpSnap options",
+        "data": {
+          "scan_interval": "Polling interval",
+          "pending_timeout": "Maximum wait for a power action"
+        },
+        "data_description": {
+          "scan_interval": "How often to ask UpSnap for the state of the devices.",
+          "pending_timeout": "After this time a device that has not reached the requested state stops showing as turning on or off."
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": {
+        "state_attributes": {
+          "power_state": {
+            "name": "Power state",
+            "state": {
+              "on": "On",
+              "off": "Off",
+              "turning_on": "Turning on",
+              "turning_off": "Turning off",
+              "restarting": "Restarting"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "power_state": {
+        "name": "Power state",
+        "state": {
+          "on": "On",
+          "off": "Off",
+          "turning_on": "Turning on",
+          "turning_off": "Turning off",
+          "restarting": "Restarting"
+        }
+      }
+    },
+    "button": {
+      "sleep": {
+        "name": "Sleep"
+      }
+    }
+  },
+  "exceptions": {
+    "action_in_progress": {
+      "message": "A power action is already in progress for {device}."
+    },
+    "action_failed": {
+      "message": "The power action for {device} failed: {error}"
+    },
+    "device_not_found": {
+      "message": "{device} no longer exists in UpSnap."
+    },
+    "invalid_auth": {
+      "message": "UpSnap rejected the credentials."
+    },
+    "no_power_permission": {
+      "message": "The UpSnap user is not allowed to power {device}. Give it the Power permission in UpSnap."
+    },
+    "update_failed": {
+      "message": "Error getting the devices from UpSnap: {error}"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "entity": {
+    "switch": {
+      "power": {
+        "default": "mdi:monitor-off",
+        "state": {
+          "on": "mdi:monitor"
+        }
+      }
+    },
+    "sensor": {
+      "power_state": {
+        "default": "mdi:power",
+        "state": {
+          "on": "mdi:power-on",
+          "off": "mdi:power-off",
+          "turning_on": "mdi:power-cycle",
+          "turning_off": "mdi:power-cycle",
+          "restarting": "mdi:restart"
+        }
+      }
+    },
+    "button": {
+      "sleep": {
+        "default": "mdi:power-sleep"
+      }
+    }
+  }
+}

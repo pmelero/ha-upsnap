@@ -1,0 +1,108 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar con UpSnap",
+        "description": "Usa un usuario de UpSnap con los permisos **Leer** y **Energía** en los equipos que quieras controlar. También sirve la cuenta de administrador de UpSnap.",
+        "data": {
+          "url": "URL",
+          "username": "Usuario o email",
+          "password": "Contraseña",
+          "verify_ssl": "Verificar el certificado SSL"
+        },
+        "data_description": {
+          "url": "Dirección de la web de UpSnap, por ejemplo http://192.168.1.10:8090"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Volver a iniciar sesión en UpSnap",
+        "description": "UpSnap en {url} ha rechazado las credenciales guardadas.",
+        "data": {
+          "username": "Usuario o email",
+          "password": "Contraseña"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "No se ha podido conectar con UpSnap.",
+      "invalid_auth": "Usuario o contraseña incorrectos.",
+      "invalid_url": "La URL debe empezar por http:// o https://.",
+      "no_devices": "Este usuario no ve ningún equipo. Dale el permiso Leer en tus equipos dentro de UpSnap.",
+      "unknown": "Error inesperado."
+    },
+    "abort": {
+      "already_configured": "Este servidor de UpSnap ya está configurado.",
+      "reauth_successful": "Se ha vuelto a iniciar sesión correctamente."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de UpSnap",
+        "data": {
+          "scan_interval": "Intervalo de consulta",
+          "pending_timeout": "Espera máxima de una orden"
+        },
+        "data_description": {
+          "scan_interval": "Cada cuánto se pregunta a UpSnap por el estado de los equipos.",
+          "pending_timeout": "Pasado este tiempo, un equipo que no ha llegado al estado pedido deja de aparecer como encendiéndose o apagándose."
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "power": {
+        "state_attributes": {
+          "power_state": {
+            "name": "Estado de energía",
+            "state": {
+              "on": "Encendido",
+              "off": "Apagado",
+              "turning_on": "Encendiendo",
+              "turning_off": "Apagando",
+              "restarting": "Reiniciando"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "power_state": {
+        "name": "Estado de energía",
+        "state": {
+          "on": "Encendido",
+          "off": "Apagado",
+          "turning_on": "Encendiendo",
+          "turning_off": "Apagando",
+          "restarting": "Reiniciando"
+        }
+      }
+    },
+    "button": {
+      "sleep": {
+        "name": "Suspender"
+      }
+    }
+  },
+  "exceptions": {
+    "action_in_progress": {
+      "message": "Ya hay una orden en curso para {device}."
+    },
+    "action_failed": {
+      "message": "La orden para {device} ha fallado: {error}"
+    },
+    "device_not_found": {
+      "message": "{device} ya no existe en UpSnap."
+    },
+    "invalid_auth": {
+      "message": "UpSnap ha rechazado las credenciales."
+    },
+    "no_power_permission": {
+      "message": "El usuario de UpSnap no tiene permiso para encender o apagar {device}. Dale el permiso Energía en UpSnap."
+    },
+    "update_failed": {
+      "message": "Error al obtener los equipos de UpSnap: {error}"
+    }
+  }
+}
