@@ -114,3 +114,7 @@ styles:
 ## License
 
 MIT
+
+The UpSnap logo used as the integration icon belongs to the
+[UpSnap](https://github.com/seriousm4x/UpSnap) project (MIT License, © seriousm4x).
+This integration is not affiliated with the UpSnap project.
