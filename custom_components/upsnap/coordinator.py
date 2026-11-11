@@ -34,6 +34,7 @@ from .const import (
     DEFAULT_PENDING_TIMEOUT,
     DOMAIN,
     FAST_SCAN_INTERVAL,
+    MIN_HARD_TIMEOUT,
     POWER_OFF,
     POWER_ON,
     POWER_RESTARTING,
@@ -43,6 +44,7 @@ from .const import (
     STATUS_OFFLINE,
     STATUS_ONLINE,
     STATUS_PENDING,
+    UPSNAP_MAX_ACTION_TIME,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,10 +63,15 @@ class PendingAction:
 
     action: str
     target_on: bool
-    deadline: float
+    # Safety limit, in case UpSnap never finishes the action.
+    hard_deadline: float
     # Number of the last poll started before UpSnap accepted the action. None while
     # the request is still in flight: no data can finish the action until then.
     accepted_after_poll: int | None = None
+    # When UpSnap was first seen done with the device without the device being in
+    # the requested state. The action timeout counts from then, not while UpSnap is
+    # still working (a restart alone can take over 4 minutes).
+    idle_since: float | None = None
 
 
 class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
@@ -89,6 +96,9 @@ class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
         self._pending_timeout = int(
             entry.options.get(CONF_PENDING_TIMEOUT, DEFAULT_PENDING_TIMEOUT)
         )
+        self._hard_timeout = max(
+            MIN_HARD_TIMEOUT, self._pending_timeout + UPSNAP_MAX_ACTION_TIME
+        )
         self._pending: dict[str, PendingAction] = {}
         self._real_on: dict[str, bool] = {}
         self._power_state: dict[str, str] = {}
@@ -111,15 +121,19 @@ class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
     def pending_actions(self) -> dict[str, dict[str, Any]]:
         """Describe the actions in progress (for diagnostics)."""
         now = time.monotonic()
-        return {
-            device_id: {
+        result: dict[str, dict[str, Any]] = {}
+        for device_id, pending in self._pending.items():
+            left = pending.hard_deadline - now
+            if pending.idle_since is not None:
+                left = min(left, pending.idle_since + self._pending_timeout - now)
+            result[device_id] = {
                 "action": pending.action,
                 "target_on": pending.target_on,
                 "accepted": pending.accepted_after_poll is not None,
-                "seconds_left": round(max(pending.deadline - now, 0)),
+                "upsnap_finished": pending.idle_since is not None,
+                "seconds_left": round(max(left, 0)),
             }
-            for device_id, pending in self._pending.items()
-        }
+        return result
 
     async def _async_update_data(self) -> dict[str, UpSnapDevice]:
         self._polls_started += 1
@@ -207,29 +221,11 @@ class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
             self._real_on[device_id] = real_on
 
             pending = self._pending.get(device_id)
-            if pending is not None:
-                accepted = pending.accepted_after_poll
-                if (
-                    accepted is not None
-                    and poll > accepted
-                    and device.status != STATUS_PENDING
-                    and real_on == pending.target_on
-                ):
-                    _LOGGER.debug(
-                        "%s finished the %s action", device.name, pending.action
-                    )
-                    del self._pending[device_id]
-                    pending = None
-                elif now > pending.deadline:
-                    _LOGGER.warning(
-                        "%s did not turn %s within %s seconds after the %s request",
-                        device.name,
-                        "on" if pending.target_on else "off",
-                        self._pending_timeout,
-                        pending.action,
-                    )
-                    del self._pending[device_id]
-                    pending = None
+            if pending is not None and not self._pending_still_running(
+                device, pending, poll, real_on, now
+            ):
+                del self._pending[device_id]
+                pending = None
 
             if pending is not None:
                 if pending.action == ACTION_REBOOT:
@@ -247,6 +243,46 @@ class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
             device.status == STATUS_PENDING for device in devices.values()
         )
         self.update_interval = self._fast_scan_interval if busy else self._scan_interval
+
+    def _pending_still_running(
+        self,
+        device: UpSnapDevice,
+        pending: PendingAction,
+        poll: int,
+        real_on: bool,
+        now: float,
+    ) -> bool:
+        """Update a pending action with new data; return False once it is over."""
+        accepted = pending.accepted_after_poll
+        reflects_action = accepted is not None and poll > accepted
+        busy = device.status == STATUS_PENDING
+        if reflects_action and not busy and real_on == pending.target_on:
+            _LOGGER.debug("%s finished the %s action", device.name, pending.action)
+            return False
+
+        if reflects_action:
+            if busy:
+                # UpSnap is still working on it: no timeout while it does.
+                pending.idle_since = None
+            elif pending.idle_since is None:
+                pending.idle_since = now
+        waited = 0.0 if pending.idle_since is None else now - pending.idle_since
+
+        if now > pending.hard_deadline or waited > self._pending_timeout:
+            if now > pending.hard_deadline:
+                limit, since = self._hard_timeout, f"the {pending.action} request"
+            else:
+                limit = self._pending_timeout
+                since = f"UpSnap finished the {pending.action} action"
+            _LOGGER.warning(
+                "%s did not turn %s within %s seconds after %s",
+                device.name,
+                "on" if pending.target_on else "off",
+                limit,
+                since,
+            )
+            return False
+        return True
 
     async def async_power(self, device_id: str, action: str) -> None:
         """Send a power action and track it until the device reaches the new state."""
@@ -270,7 +306,7 @@ class UpSnapCoordinator(DataUpdateCoordinator[dict[str, UpSnapDevice]]):
         pending = PendingAction(
             action=action,
             target_on=action in (ACTION_WAKE, ACTION_REBOOT),
-            deadline=time.monotonic() + self._pending_timeout,
+            hard_deadline=time.monotonic() + self._hard_timeout,
         )
         self._pending[device_id] = pending
         self._refresh_listeners()

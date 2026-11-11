@@ -64,10 +64,10 @@
       "init": {
         "title": "UpSnap options",
         "data": {
-          "pending_timeout": "Maximum wait for a power action"
+          "pending_timeout": "Extra wait after UpSnap finishes"
         },
         "data_description": {
-          "pending_timeout": "After this time a device that has not reached the requested state stops showing as turning on or off."
+          "pending_timeout": "While UpSnap is turning a device on, off or restarting it, the device shows as turning on/off. If UpSnap finishes and the device has not reached the requested state yet (for example a computer still booting), keep waiting this long."
         },
         "description": "Home Assistant asks UpSnap for the state of the devices every 10 seconds, and every 3 seconds while a power action is in progress."
       }

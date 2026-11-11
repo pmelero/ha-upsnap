@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import MagicMock
 
+from freezegun.api import FrozenDateTimeFactory
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
-from homeassistant.const import ATTR_ENTITY_ID, EntityCategory
+from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
+from homeassistant.const import ATTR_ENTITY_ID, SERVICE_TURN_OFF, EntityCategory
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from .conftest import DESKTOP, LAPTOP, devices, with_status
@@ -75,6 +80,66 @@ async def test_restart_ignores_data_from_before_upsnap_accepted_it(
     mock_client.power.side_effect = power
     await _press(hass, "button.desktop_restart")
     assert hass.states.get("sensor.desktop_power_state").state == "restarting"
+
+
+async def test_long_restart(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A restart keeps showing as restarting for as long as UpSnap works on it."""
+    coordinator = init_integration.runtime_data
+    mock_client.get_devices.return_value = devices(
+        with_status(DESKTOP, "pending"), LAPTOP
+    )
+    await _press(hass, "button.desktop_restart")
+
+    # Shutdown, the 15 s pause and the wake can take over 4 minutes in UpSnap.
+    freezer.tick(timedelta(seconds=250))
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.desktop_power_state").state == "restarting"
+
+    # Pressing the switch meanwhile is refused instead of interrupting the restart.
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: "switch.desktop"},
+            blocking=True,
+        )
+
+    mock_client.get_devices.return_value = devices(DESKTOP, LAPTOP)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.desktop_power_state").state == "on"
+
+
+async def test_upsnap_stuck(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """If UpSnap never finishes, the action stops being tracked after 10 minutes."""
+    coordinator = init_integration.runtime_data
+    mock_client.get_devices.return_value = devices(
+        with_status(DESKTOP, "pending"), LAPTOP
+    )
+    await _press(hass, "button.desktop_restart")
+
+    freezer.tick(timedelta(seconds=599))
+    await coordinator.async_refresh()
+    assert coordinator.power_state(DESKTOP.id) == "restarting"
+
+    freezer.tick(timedelta(seconds=2))
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    # UpSnap still says pending: shown as an action started outside Home Assistant.
+    assert coordinator.pending_actions() == {}
+    assert "Desktop did not turn on within 600 seconds after the reboot" in caplog.text
 
 
 async def test_sleep(

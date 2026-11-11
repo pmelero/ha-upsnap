@@ -207,7 +207,44 @@ async def test_pending_timeout(
     switch = hass.states.get("switch.laptop")
     assert switch is not None
     assert switch.state == STATE_OFF
-    assert "Laptop did not turn on within 180 seconds" in caplog.text
+    assert (
+        "Laptop did not turn on within 180 seconds after UpSnap finished the wake"
+        in caplog.text
+    )
+
+
+async def test_wait_counts_from_when_upsnap_finishes(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """The extra wait starts when UpSnap is done, not when the action was sent."""
+    coordinator = init_integration.runtime_data
+    mock_client.get_devices.return_value = devices(
+        DESKTOP, with_status(LAPTOP, "pending")
+    )
+    await _switch(hass, SERVICE_TURN_ON, "switch.laptop")
+
+    # UpSnap waits its 2 minutes for the computer to answer ping...
+    freezer.tick(timedelta(seconds=120))
+    await coordinator.async_refresh()
+    # ...then gives up and marks it offline, but the computer is still booting.
+    mock_client.get_devices.return_value = devices(DESKTOP, LAPTOP)
+    await coordinator.async_refresh()
+    freezer.tick(timedelta(seconds=170))
+    await coordinator.async_refresh()
+    assert _power_state(hass, "laptop") == "turning_on"
+    pending = coordinator.pending_actions()[LAPTOP.id]
+    assert pending["upsnap_finished"] is True
+    assert pending["seconds_left"] == 10
+
+    mock_client.get_devices.return_value = devices(
+        DESKTOP, with_status(LAPTOP, "online")
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert _power_state(hass, "laptop") == "on"
 
 
 async def test_action_started_outside_home_assistant(

@@ -37,7 +37,10 @@ async def test_diagnostics(
         "verify_ssl": True,
     }
     assert result["coordinator"]["last_update_success"] is True
-    assert result["coordinator"]["pending_actions"][LAPTOP.id]["action"] == "wake"
+    pending = result["coordinator"]["pending_actions"][LAPTOP.id]
+    assert pending["action"] == "wake"
+    assert pending["upsnap_finished"] is False
+    assert pending["seconds_left"] > 0
     laptop = next(device for device in result["devices"] if device["id"] == LAPTOP.id)
     assert laptop["ip"] == REDACTED
     assert laptop["mac"] == REDACTED

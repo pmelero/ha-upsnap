@@ -99,7 +99,7 @@ Reconfigure**.
 
 | Option | Default | Description |
 |---|---|---|
-| Maximum wait for a power action | 180 s | After this time a device that has not reached the requested state stops showing as turning on/off. UpSnap itself gives up after 2 minutes. |
+| Extra wait after UpSnap finishes | 180 s | A device shows as turning on/off (or restarting) for as long as UpSnap is working on it; a restart alone can take over 4 minutes. If UpSnap finishes and the device has not reached the requested state yet (for example a computer still booting after UpSnap gave up waiting), it keeps showing as turning on/off for this long. After 10 minutes it stops anyway. |
 
 ## Entities
 

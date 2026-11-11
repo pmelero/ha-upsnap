@@ -14,10 +14,15 @@ SCAN_INTERVAL: Final = 10  # seconds
 # Poll faster while a power action is in progress, to show the result sooner.
 FAST_SCAN_INTERVAL: Final = 3  # seconds
 
-# UpSnap itself gives up after 2 minutes; leave some margin for slow boots.
+# How long to keep waiting for a device after UpSnap has finished an action, for
+# example a computer still booting after UpSnap gave up waiting for it.
 DEFAULT_PENDING_TIMEOUT: Final = 180  # seconds
 MIN_PENDING_TIMEOUT: Final = 30
 MAX_PENDING_TIMEOUT: Final = 900
+# Safety limit in case UpSnap never finishes. UpSnap gives up on each step after
+# 2 minutes, and a restart is a shutdown, a 15 s pause and a wake.
+MIN_HARD_TIMEOUT: Final = 600  # seconds
+UPSNAP_MAX_ACTION_TIME: Final = 300  # seconds
 
 # Values of the "status" field of an UpSnap device.
 STATUS_ONLINE: Final = "online"

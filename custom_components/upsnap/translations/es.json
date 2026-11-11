@@ -64,10 +64,10 @@
       "init": {
         "title": "Opciones de UpSnap",
         "data": {
-          "pending_timeout": "Espera máxima de una orden"
+          "pending_timeout": "Espera extra cuando UpSnap termina"
         },
         "data_description": {
-          "pending_timeout": "Pasado este tiempo, un equipo que no ha llegado al estado pedido deja de aparecer como encendiéndose o apagándose."
+          "pending_timeout": "Mientras UpSnap enciende, apaga o reinicia un equipo, este aparece como encendiéndose o apagándose. Si UpSnap termina y el equipo aún no ha llegado al estado pedido (por ejemplo, un PC que sigue arrancando), se espera este tiempo más."
         },
         "description": "Home Assistant pregunta a UpSnap por el estado de los equipos cada 10 segundos, y cada 3 segundos mientras hay una orden en curso."
       }
