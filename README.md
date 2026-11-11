@@ -31,7 +31,17 @@ Control the computers you manage with [UpSnap](https://github.com/seriousm4x/UpS
 
 ## Installation
 
-### HACS (custom repository)
+### Home Assistant 2026.11 or newer (Marketplace)
+
+[![Open your Home Assistant instance and open this repository in the Marketplace.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=pmelero&repository=ha-upsnap&category=integration)
+
+Or manually:
+
+1. **Settings → Marketplace**, then **Add from link** in the upper-right corner.
+2. Enter `https://github.com/pmelero/ha-upsnap` and select **Add**.
+3. Install **UpSnap** and restart Home Assistant.
+
+### Home Assistant 2026.10 or older (HACS)
 
 1. HACS → ⋮ → **Custom repositories**.
 2. Add `https://github.com/pmelero/ha-upsnap` with type **Integration**.
