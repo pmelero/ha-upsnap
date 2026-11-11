@@ -38,6 +38,7 @@ LAPTOP = UpSnapDevice(
     mac="aa:bb:cc:dd:ee:02",
     status="offline",
     sol_enabled=True,
+    has_shutdown_cmd=False,
 )
 SERVER = UpSnapDevice(
     id="server000000003",
@@ -46,6 +47,7 @@ SERVER = UpSnapDevice(
     mac="",
     status="online",
     sol_enabled=False,
+    can_power=False,
 )
 
 

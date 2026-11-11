@@ -18,7 +18,7 @@ them and see whether they are on, off, or still booting or shutting down.
   - **Switch**: on sends Wake-on-LAN, off runs the shutdown command configured in
     UpSnap.
   - **Power state** sensor: `on`, `off`, `turning_on`, `turning_off` or `restarting`.
-  - **Restart** button, and a **Sleep** button for devices with Sleep-on-LAN enabled.
+  - **Restart** and **Sleep** buttons, where UpSnap's own device menu offers them.
 - Tracks every action until it is really done: after you turn a computer on, it shows
   as *turning on* until it answers ping, not just until the magic packet is sent.
   Further presses are ignored meanwhile. Actions started from the UpSnap web UI are
@@ -108,7 +108,13 @@ Reconfigure**.
 | Switch | `switch.desktop` | Turn the device on or off. While an action is in progress it shows the requested state. Attribute `power_state` has the detailed state. |
 | Power state | `sensor.desktop_power_state` | `on`, `off`, `turning_on`, `turning_off` or `restarting`. |
 | Restart | `button.desktop_restart` | Shut down, wait 15 s and wake again (done by UpSnap). |
-| Sleep | `button.desktop_sleep` | Only for devices with Sleep-on-LAN enabled in UpSnap. |
+| Sleep | `button.desktop_sleep` | Put the device to sleep with Sleep-on-LAN. |
+
+The buttons follow UpSnap's own device menu (**Reboot** and **Sleep**). They exist
+only for devices the UpSnap user has the **Power** permission on, and only if the
+device has a shutdown command (restart) or Sleep-on-LAN enabled (sleep). They can only
+be pressed while the device is on and no other action is in progress; otherwise they
+show as unavailable. Whether a shutdown command is set is checked without reading it.
 
 How the UpSnap status becomes the power state:
 

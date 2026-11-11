@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 from unittest.mock import MagicMock
 
@@ -16,7 +17,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
-from .conftest import DESKTOP, LAPTOP, devices, with_status
+from .conftest import DESKTOP, LAPTOP, SERVER, devices, with_status
 
 
 async def _press(hass: HomeAssistant, entity_id: str) -> None:
@@ -25,21 +26,68 @@ async def _press(hass: HomeAssistant, entity_id: str) -> None:
     )
 
 
-async def test_buttons_created(
+async def test_buttons_follow_upsnap(
     hass: HomeAssistant,
     init_integration: MockConfigEntry,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Every device gets a restart button; only Sleep-on-LAN devices a sleep one."""
-    for entity_id in (
-        "button.desktop_restart",
-        "button.laptop_restart",
-        "button.laptop_sleep",
-    ):
+    """Buttons exist where UpSnap's device menu would offer the action."""
+    # Desktop: shutdown command, no Sleep-on-LAN. Laptop: the other way round.
+    for entity_id in ("button.desktop_restart", "button.laptop_sleep"):
         entry = entity_registry.async_get(entity_id)
         assert entry is not None, entity_id
         assert entry.entity_category is EntityCategory.CONFIG
     assert entity_registry.async_get("button.desktop_sleep") is None
+    assert entity_registry.async_get("button.laptop_restart") is None
+
+    # Like in UpSnap, they can only be used while the device is on.
+    assert hass.states.get("button.desktop_restart").state != "unavailable"
+    assert hass.states.get("button.laptop_sleep").state == "unavailable"
+
+
+async def test_old_buttons_removed(
+    hass: HomeAssistant,
+    mock_client: MagicMock,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Restart buttons created by older versions where UpSnap offers none go away."""
+    mock_config_entry.add_to_hass(hass)
+    entity_registry.async_get_or_create(
+        "button",
+        "upsnap",
+        f"{LAPTOP.id}_reboot",
+        config_entry=mock_config_entry,
+        suggested_object_id="laptop_restart",
+    )
+    assert entity_registry.async_get("button.laptop_restart") is not None
+
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entity_registry.async_get("button.laptop_restart") is None
+    assert entity_registry.async_get("button.desktop_restart") is not None
+
+
+async def test_buttons_appear_and_need_permission(
+    hass: HomeAssistant,
+    init_integration: MockConfigEntry,
+    mock_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Buttons appear when UpSnap starts to offer the action, if allowed."""
+    coordinator = init_integration.runtime_data
+    mock_client.get_devices.return_value = devices(
+        DESKTOP, replace(LAPTOP, status="online", has_shutdown_cmd=True), SERVER
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # A shutdown command was added to the laptop in UpSnap.
+    assert hass.states.get("button.laptop_restart").state != "unavailable"
+    # No Power permission on the server: no restart button, like in UpSnap.
+    assert hass.states.get("switch.server") is not None
+    assert entity_registry.async_get("button.server_restart") is None
 
 
 async def test_restart(
@@ -56,11 +104,14 @@ async def test_restart(
     mock_client.power.assert_awaited_once_with(DESKTOP.id, "reboot")
     assert hass.states.get("sensor.desktop_power_state").state == "restarting"
     assert hass.states.get("switch.desktop").state == "on"
+    # Not available while the restart is in progress.
+    assert hass.states.get("button.desktop_restart").state == "unavailable"
 
     mock_client.get_devices.return_value = devices(DESKTOP, LAPTOP)
     await coordinator.async_refresh()
     await hass.async_block_till_done()
     assert hass.states.get("sensor.desktop_power_state").state == "on"
+    assert hass.states.get("button.desktop_restart").state != "unavailable"
 
 
 async def test_restart_ignores_data_from_before_upsnap_accepted_it(

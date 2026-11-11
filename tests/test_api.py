@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import json
 import time
 
@@ -48,9 +48,17 @@ class FakeUpSnap:
     login_status: int | None = None
     devices_html: bool = False
     reject_power_tokens: bool = False
+    # Devices (by index) without a shutdown command, and the user's Power ids.
+    no_shutdown_cmd: set[int] = field(default_factory=lambda: {2})
+    power_ids: list[str] = field(
+        default_factory=lambda: ["device000000000", "device000000001"]
+    )
+    permissions_status: int = 200
+    filter_status: int = 200
     valid_tokens: set[str] = field(default_factory=set)
     logins: list[str] = field(default_factory=list)
     list_queries: list[dict[str, str]] = field(default_factory=list)
+    permission_queries: list[dict[str, str]] = field(default_factory=list)
     power_calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
 
     async def auth(self, request: web.Request) -> web.Response:
@@ -98,10 +106,19 @@ class FakeUpSnap:
                 "status": "online" if i % 2 else "offline",
                 "sol_enabled": i == 1,
                 "password": "wol-password",
-                "shutdown_cmd": "net rpc shutdown -U user%password",
+                "shutdown_cmd": ""
+                if i in self.no_shutdown_cmd
+                else "net rpc shutdown -U user%password",
             }
             for i in range(self.device_count)
         ]
+        if "filter" in request.query:
+            if self.filter_status != 200:
+                return web.json_response(
+                    {"message": "Invalid filter."}, status=self.filter_status
+                )
+            assert request.query["filter"] == 'shutdown_cmd != ""'
+            records = [record for record in records if record["shutdown_cmd"]]
         fields = request.query["fields"].split(",")
         items = [
             {key: value for key, value in record.items() if key in fields}
@@ -115,6 +132,22 @@ class FakeUpSnap:
                 "totalItems": len(records),
                 "totalPages": -(-len(records) // per_page),
             }
+        )
+
+    async def permissions(self, request: web.Request) -> web.Response:
+        """Return the permissions record of the logged-in user."""
+        self.permission_queries.append(dict(request.query))
+        if self.permissions_status != 200:
+            return web.json_response(
+                {"message": "Not available."}, status=self.permissions_status
+            )
+        items = []
+        if request.headers.get("Authorization") in self.valid_tokens:
+            assert request.query["filter"] == "user.id = 'user1'"
+            assert request.query["fields"] == "power"
+            items = [{"power": self.power_ids}]
+        return web.json_response(
+            {"items": items, "page": 1, "perPage": 200, "totalPages": 1}
         )
 
     async def power(self, request: web.Request) -> web.Response:
@@ -149,6 +182,7 @@ async def fake_upsnap() -> AsyncGenerator[tuple[FakeUpSnap, str]]:
     app = web.Application()
     app.router.add_post("/api/collections/{collection}/auth-with-password", fake.auth)
     app.router.add_get("/api/collections/devices/records", fake.devices)
+    app.router.add_get("/api/collections/permissions/records", fake.permissions)
     app.router.add_get("/api/upsnap/{action}/{id}", fake.power)
     server = TestServer(app, host="127.0.0.1")
     await server.start_server()
@@ -178,14 +212,91 @@ async def test_login_and_list_devices(
     found = await client.get_devices()
 
     assert fake.logins == ["users"]
-    assert fake.list_queries[-1]["fields"] == DEVICE_FIELDS
+    assert fake.list_queries[0]["fields"] == DEVICE_FIELDS
+    # Secrets are never requested: the shutdown command is only used in a filter.
+    for query in fake.list_queries:
+        assert "shutdown_cmd" not in query["fields"]
+        assert "password" not in query["fields"]
     assert len(found) == 3
     device = found["device000000001"]
     assert device.name == "PC 1"
     assert device.status == "online"
     assert device.sol_enabled is True
+    assert device.has_shutdown_cmd is True
+    assert device.can_power is True
     assert not hasattr(device, "password")
+    # PC 2 has no shutdown command and the user lacks the Power permission on it.
+    assert found["device000000002"].has_shutdown_cmd is False
+    assert found["device000000002"].can_power is False
     assert client.url == url.rstrip("/")
+
+
+async def test_superuser_can_power_everything(
+    fake_upsnap: tuple[FakeUpSnap, str], http_session: ClientSession
+) -> None:
+    """The admin account has no permissions record and may power every device."""
+    fake, url = fake_upsnap
+    client = UpSnapClient(http_session, url, "admin@x.io", "admin")
+    found = await client.get_devices()
+    assert all(device.can_power for device in found.values())
+    assert fake.permission_queries == []
+
+
+async def test_unknown_capabilities(
+    fake_upsnap: tuple[FakeUpSnap, str], http_session: ClientSession
+) -> None:
+    """If UpSnap cannot answer the lookups, every device keeps every action."""
+    fake, url = fake_upsnap
+    fake.permissions_status = 404
+    fake.filter_status = 400
+    client = UpSnapClient(http_session, url, "homeassistant", "secret")
+    found = await client.get_devices()
+    assert all(device.can_power for device in found.values())
+    assert all(device.has_shutdown_cmd for device in found.values())
+
+
+async def test_no_readable_devices(
+    fake_upsnap: tuple[FakeUpSnap, str], http_session: ClientSession
+) -> None:
+    """Without readable devices nothing else is looked up."""
+    fake, url = fake_upsnap
+    fake.device_count = 0
+    client = UpSnapClient(http_session, url, "homeassistant", "secret")
+    assert await client.get_devices() == {}
+    assert len(fake.list_queries) == 1
+    assert fake.permission_queries == []
+
+
+@pytest.mark.parametrize("lookup", ["filter_status", "permissions_status"])
+async def test_capability_lookup_rate_limited(
+    fake_upsnap: tuple[FakeUpSnap, str], http_session: ClientSession, lookup: str
+) -> None:
+    """Connection problems during the lookups fail the update instead of hiding."""
+    fake, url = fake_upsnap
+    setattr(fake, lookup, 429)
+    client = UpSnapClient(http_session, url, "homeassistant", "secret")
+    with pytest.raises(UpSnapConnectionError):
+        await client.get_devices()
+
+
+async def test_capabilities_cached(
+    fake_upsnap: tuple[FakeUpSnap, str], http_session: ClientSession
+) -> None:
+    """Lookups run once a minute, or as soon as a new device appears."""
+    fake, url = fake_upsnap
+    client = UpSnapClient(http_session, url, "homeassistant", "secret")
+    await client.get_devices()
+    await client.get_devices()
+    assert len(fake.permission_queries) == 1
+
+    fake.device_count = 4
+    await client.get_devices()
+    assert len(fake.permission_queries) == 2
+
+    assert client._capabilities is not None
+    client._capabilities = replace(client._capabilities, fetched_at=-1e9)
+    await client.get_devices()
+    assert len(fake.permission_queries) == 3
 
 
 async def test_superuser_fallback(
@@ -231,8 +342,8 @@ async def test_relogin_before_expiry(
     fake, url = fake_upsnap
     fake.token_lifetime = 60
     client = UpSnapClient(http_session, url, "homeassistant", "secret")
-    await client.get_devices()
-    await client.get_devices()
+    await client.login()
+    await client.power("device000000001", "wake")
     assert fake.logins == ["users", "users"]
 
 
@@ -244,7 +355,8 @@ async def test_pagination(
     fake.device_count = 450
     client = UpSnapClient(http_session, url, "homeassistant", "secret")
     assert len(await client.get_devices()) == 450
-    assert [query["page"] for query in fake.list_queries] == ["1", "2", "3"]
+    pages = [q["page"] for q in fake.list_queries if q["fields"] == DEVICE_FIELDS]
+    assert pages == ["1", "2", "3"]
 
 
 async def test_power(

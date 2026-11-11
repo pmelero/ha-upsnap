@@ -52,12 +52,17 @@ def async_add_device_entities(
     async_add_entities: AddEntitiesCallback,
     factory: Callable[[UpSnapCoordinator, UpSnapDevice], Iterable[Entity]],
 ) -> None:
-    """Add entities for every device, including devices added to UpSnap later."""
+    """Add the entities of every device, also those that appear later.
+
+    Devices added to UpSnap get their entities, and so do entities that start to
+    apply to a device later (for example a restart button once a shutdown
+    command is set in UpSnap).
+    """
     coordinator = entry.runtime_data
-    known: set[str] = set()
+    added: dict[str, set[str | None]] = {}  # device id -> unique ids added
 
     @callback
-    def _add_new_devices() -> None:
+    def _add_new_entities() -> None:
         # Forget devices the coordinator removed from the registry (their entities
         # are gone too), so they get new entities if they come back.
         registered = {
@@ -68,19 +73,18 @@ def async_add_device_entities(
             for domain, identifier in device_entry.identifiers
             if domain == DOMAIN
         }
-        known.intersection_update(coordinator.data.keys() | registered)
+        for device_id in added.keys() - coordinator.data.keys() - registered:
+            del added[device_id]
 
-        new = [
-            device
-            for device_id, device in coordinator.data.items()
-            if device_id not in known
-        ]
-        if not new:
-            return
-        known.update(device.id for device in new)
-        async_add_entities(
-            entity for device in new for entity in factory(coordinator, device)
-        )
+        new_entities: list[Entity] = []
+        for device in coordinator.data.values():
+            done = added.setdefault(device.id, set())
+            for entity in factory(coordinator, device):
+                if entity.unique_id not in done:
+                    done.add(entity.unique_id)
+                    new_entities.append(entity)
+        if new_entities:
+            async_add_entities(new_entities)
 
-    _add_new_devices()
-    entry.async_on_unload(coordinator.async_add_listener(_add_new_devices))
+    _add_new_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new_entities))

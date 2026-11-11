@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import logging
 import time
@@ -30,6 +30,9 @@ SLEEP_TIMEOUT = aiohttp.ClientTimeout(total=40)
 AUTH_COLLECTIONS = ("users", "_superusers")
 # Log in again when the token expires in less than this many seconds.
 TOKEN_REFRESH_MARGIN = 3600
+# Which devices have a shutdown command and which ones the user may power on and
+# off change rarely: look them up at most once a minute (or for new devices).
+CAPABILITIES_MAX_AGE = 60
 
 
 class UpSnapError(Exception):
@@ -62,6 +65,10 @@ class UpSnapDevice:
     mac: str
     status: str
     sol_enabled: bool
+    # Whether a shutdown command is set (the command itself is never fetched).
+    has_shutdown_cmd: bool = True
+    # Whether the user has the Power permission on the device.
+    can_power: bool = True
 
     @classmethod
     def from_record(cls, record: dict[str, Any]) -> UpSnapDevice:
@@ -75,6 +82,18 @@ class UpSnapDevice:
             status=str(record.get("status") or ""),
             sol_enabled=bool(record.get("sol_enabled")),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class _Capabilities:
+    """Shutdown commands and Power permissions, as last looked up."""
+
+    fetched_at: float
+    device_ids: frozenset[str]
+    # None means "unknown": assume yes, as before these lookups existed.
+    with_shutdown_cmd: frozenset[str] | None
+    # None means every device (admin account) or unknown.
+    can_power: frozenset[str] | None
 
 
 def token_expiry(token: str) -> float | None:
@@ -105,8 +124,10 @@ class UpSnapClient:
         self._token: str | None = None
         self._token_expiry: float | None = None
         self._auth_collection: str | None = None
+        self._user_id: str | None = None
         self._login_lock = asyncio.Lock()
         self._last_device_count = 0
+        self._capabilities: _Capabilities | None = None
 
     @property
     def url(self) -> str:
@@ -131,6 +152,12 @@ class UpSnapClient:
                 self._token = str(data["token"])
                 self._token_expiry = token_expiry(self._token)
                 self._auth_collection = collection
+                record = data.get("record")
+                self._user_id = (
+                    str(record["id"])
+                    if isinstance(record, dict) and record.get("id")
+                    else None
+                )
                 return
             if status == 429:
                 raise UpSnapConnectionError("UpSnap is rate limiting login attempts")
@@ -150,7 +177,19 @@ class UpSnapClient:
             await self._relogin()
             devices = await self._get_devices()
         self._last_device_count = len(devices)
-        return devices
+        if not devices:
+            return devices
+        capabilities = await self._get_capabilities(frozenset(devices))
+        return {
+            device_id: replace(
+                device,
+                has_shutdown_cmd=capabilities.with_shutdown_cmd is None
+                or device_id in capabilities.with_shutdown_cmd,
+                can_power=capabilities.can_power is None
+                or device_id in capabilities.can_power,
+            )
+            for device_id, device in devices.items()
+        }
 
     async def power(self, device_id: str, action: str) -> None:
         """Ask UpSnap to wake, shut down, reboot or sleep a device."""
@@ -165,29 +204,85 @@ class UpSnapClient:
         )
 
     async def _get_devices(self) -> dict[str, UpSnapDevice]:
+        records = await self._list_records(
+            "devices", {"sort": "name", "fields": DEVICE_FIELDS}
+        )
         devices: dict[str, UpSnapDevice] = {}
+        for record in records:
+            if record.get("id"):
+                device = UpSnapDevice.from_record(record)
+                devices[device.id] = device
+        return devices
+
+    async def _get_capabilities(self, device_ids: frozenset[str]) -> _Capabilities:
+        """Look up shutdown commands and Power permissions, like UpSnap's web UI."""
+        cached = self._capabilities
+        if (
+            cached is not None
+            and time.monotonic() - cached.fetched_at < CAPABILITIES_MAX_AGE
+            and device_ids <= cached.device_ids
+        ):
+            return cached
+
+        try:
+            # Filter on the field instead of reading it: shutdown commands can
+            # contain credentials.
+            records = await self._list_records(
+                "devices", {"filter": 'shutdown_cmd != ""', "fields": "id"}
+            )
+            with_shutdown_cmd: frozenset[str] | None = frozenset(
+                str(record["id"]) for record in records if record.get("id")
+            )
+        except (UpSnapAuthError, UpSnapConnectionError):
+            raise
+        except UpSnapError as err:
+            _LOGGER.debug("Cannot tell which devices have a shutdown command: %s", err)
+            with_shutdown_cmd = None
+
+        can_power: frozenset[str] | None = None
+        if self._auth_collection != "_superusers":  # Admins may power everything.
+            params = {"fields": "power"}
+            if self._user_id:
+                params["filter"] = f"user.id = '{self._user_id}'"
+            try:
+                records = await self._list_records("permissions", params)
+                can_power = frozenset(
+                    str(device_id)
+                    for record in records
+                    for device_id in record.get("power") or []
+                )
+            except (UpSnapAuthError, UpSnapConnectionError):
+                raise
+            except UpSnapError as err:
+                _LOGGER.debug("Cannot read the UpSnap permissions: %s", err)
+
+        self._capabilities = _Capabilities(
+            fetched_at=time.monotonic(),
+            device_ids=device_ids,
+            with_shutdown_cmd=with_shutdown_cmd,
+            can_power=can_power,
+        )
+        return self._capabilities
+
+    async def _list_records(
+        self, collection: str, params: dict[str, Any]
+    ) -> list[dict[str, Any]]:
+        """Return every record of a collection the user can list (all pages)."""
+        records: list[dict[str, Any]] = []
         page = 1
         while True:
             data = await self._request(
                 "GET",
-                "/api/collections/devices/records",
-                params={
-                    "page": page,
-                    "perPage": PAGE_SIZE,
-                    "sort": "name",
-                    "fields": DEVICE_FIELDS,
-                },
+                f"/api/collections/{collection}/records",
+                params={**params, "page": page, "perPage": PAGE_SIZE},
             )
             if not isinstance(data, dict) or not isinstance(data.get("items"), list):
-                raise UpSnapError("Unexpected response while listing devices")
+                raise UpSnapError(f"Unexpected response while listing {collection}")
             items = data["items"]
-            for record in items:
-                if isinstance(record, dict) and record.get("id"):
-                    device = UpSnapDevice.from_record(record)
-                    devices[device.id] = device
+            records.extend(item for item in items if isinstance(item, dict))
             total_pages = data.get("totalPages") or 0
             if len(items) < PAGE_SIZE or page >= total_pages:
-                return devices
+                return records
             page += 1
 
     async def _ensure_token(self) -> None:
