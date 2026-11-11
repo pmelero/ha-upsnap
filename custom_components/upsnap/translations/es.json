@@ -11,7 +11,10 @@
           "verify_ssl": "Verificar el certificado SSL"
         },
         "data_description": {
-          "url": "Dirección de la web de UpSnap, por ejemplo http://192.168.1.10:8090"
+          "url": "Dirección de la web de UpSnap, por ejemplo http://192.168.1.10:8090",
+          "username": "Un usuario de UpSnap con los permisos Leer y Energía en tus equipos (o el email del administrador de UpSnap).",
+          "password": "Contraseña de ese usuario de UpSnap.",
+          "verify_ssl": "Desactívalo solo si UpSnap usa HTTPS con un certificado autofirmado."
         }
       },
       "reauth_confirm": {
@@ -20,6 +23,26 @@
         "data": {
           "username": "Usuario o email",
           "password": "Contraseña"
+        },
+        "data_description": {
+          "username": "Un usuario de UpSnap con los permisos Leer y Energía en tus equipos (o el email del administrador de UpSnap).",
+          "password": "Contraseña de ese usuario de UpSnap."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar UpSnap",
+        "description": "Cambia la dirección o las credenciales con las que se conecta a UpSnap.",
+        "data": {
+          "url": "URL",
+          "username": "Usuario o email",
+          "password": "Contraseña",
+          "verify_ssl": "Verificar el certificado SSL"
+        },
+        "data_description": {
+          "url": "Dirección de la web de UpSnap, por ejemplo http://192.168.1.10:8090",
+          "username": "Un usuario de UpSnap con los permisos Leer y Energía en tus equipos (o el email del administrador de UpSnap).",
+          "password": "Contraseña de ese usuario de UpSnap.",
+          "verify_ssl": "Desactívalo solo si UpSnap usa HTTPS con un certificado autofirmado."
         }
       }
     },
@@ -32,7 +55,8 @@
     },
     "abort": {
       "already_configured": "Este servidor de UpSnap ya está configurado.",
-      "reauth_successful": "Se ha vuelto a iniciar sesión correctamente."
+      "reauth_successful": "Se ha vuelto a iniciar sesión correctamente.",
+      "reconfigure_successful": "UpSnap se ha reconfigurado correctamente."
     }
   },
   "options": {
@@ -40,13 +64,12 @@
       "init": {
         "title": "Opciones de UpSnap",
         "data": {
-          "scan_interval": "Intervalo de consulta",
           "pending_timeout": "Espera máxima de una orden"
         },
         "data_description": {
-          "scan_interval": "Cada cuánto se pregunta a UpSnap por el estado de los equipos.",
           "pending_timeout": "Pasado este tiempo, un equipo que no ha llegado al estado pedido deja de aparecer como encendiéndose o apagándose."
-        }
+        },
+        "description": "Home Assistant pregunta a UpSnap por el estado de los equipos cada 10 segundos, y cada 3 segundos mientras hay una orden en curso."
       }
     }
   },
@@ -103,6 +126,12 @@
     },
     "update_failed": {
       "message": "Error al obtener los equipos de UpSnap: {error}"
+    }
+  },
+  "issues": {
+    "no_devices": {
+      "title": "El usuario de UpSnap no ve ningún equipo",
+      "description": "El usuario de UpSnap que usa {title} no ve ningún equipo, así que sus equipos no están disponibles en Home Assistant. En UpSnap, dale al usuario el permiso **Leer** sobre los equipos. Este aviso desaparece en cuanto vuelva a ver los equipos."
     }
   }
 }

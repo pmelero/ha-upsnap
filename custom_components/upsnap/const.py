@@ -6,12 +6,13 @@ from typing import Final
 
 DOMAIN: Final = "upsnap"
 
-CONF_SCAN_INTERVAL: Final = "scan_interval"
 CONF_PENDING_TIMEOUT: Final = "pending_timeout"
 
-DEFAULT_SCAN_INTERVAL: Final = 10  # seconds
-MIN_SCAN_INTERVAL: Final = 5
-MAX_SCAN_INTERVAL: Final = 300
+# Polling is not configurable (Home Assistant guidelines): UpSnap pings the devices
+# every few seconds and one request returns all of them, so 10 s is cheap.
+SCAN_INTERVAL: Final = 10  # seconds
+# Poll faster while a power action is in progress, to show the result sooner.
+FAST_SCAN_INTERVAL: Final = 3  # seconds
 
 # UpSnap itself gives up after 2 minutes; leave some margin for slow boots.
 DEFAULT_PENDING_TIMEOUT: Final = 180  # seconds

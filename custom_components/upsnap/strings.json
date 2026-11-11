@@ -11,7 +11,10 @@
           "verify_ssl": "Verify SSL certificate"
         },
         "data_description": {
-          "url": "Address of the UpSnap web interface, for example http://192.168.1.10:8090"
+          "url": "Address of the UpSnap web interface, for example http://192.168.1.10:8090",
+          "username": "An UpSnap user with the Read and Power permissions on your devices (or the UpSnap admin email).",
+          "password": "Password of that UpSnap user.",
+          "verify_ssl": "Turn off only if UpSnap uses HTTPS with a self-signed certificate."
         }
       },
       "reauth_confirm": {
@@ -20,6 +23,26 @@
         "data": {
           "username": "Username or email",
           "password": "Password"
+        },
+        "data_description": {
+          "username": "An UpSnap user with the Read and Power permissions on your devices (or the UpSnap admin email).",
+          "password": "Password of that UpSnap user."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure UpSnap",
+        "description": "Change the address or the credentials used to connect to UpSnap.",
+        "data": {
+          "url": "URL",
+          "username": "Username or email",
+          "password": "Password",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "url": "Address of the UpSnap web interface, for example http://192.168.1.10:8090",
+          "username": "An UpSnap user with the Read and Power permissions on your devices (or the UpSnap admin email).",
+          "password": "Password of that UpSnap user.",
+          "verify_ssl": "Turn off only if UpSnap uses HTTPS with a self-signed certificate."
         }
       }
     },
@@ -32,7 +55,8 @@
     },
     "abort": {
       "already_configured": "This UpSnap server is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "UpSnap was reconfigured successfully."
     }
   },
   "options": {
@@ -40,13 +64,12 @@
       "init": {
         "title": "UpSnap options",
         "data": {
-          "scan_interval": "Polling interval",
           "pending_timeout": "Maximum wait for a power action"
         },
         "data_description": {
-          "scan_interval": "How often to ask UpSnap for the state of the devices.",
           "pending_timeout": "After this time a device that has not reached the requested state stops showing as turning on or off."
-        }
+        },
+        "description": "Home Assistant asks UpSnap for the state of the devices every 10 seconds, and every 3 seconds while a power action is in progress."
       }
     }
   },
@@ -103,6 +126,12 @@
     },
     "update_failed": {
       "message": "Error getting the devices from UpSnap: {error}"
+    }
+  },
+  "issues": {
+    "no_devices": {
+      "title": "UpSnap user cannot see any device",
+      "description": "The UpSnap user used by {title} cannot see any device, so its devices are unavailable in Home Assistant. In UpSnap, give the user the **Read** permission on the devices. This message disappears as soon as the devices are visible again."
     }
   }
 }

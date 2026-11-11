@@ -10,6 +10,7 @@ from homeassistant.components.button import (
     ButtonEntity,
     ButtonEntityDescription,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -34,11 +35,13 @@ BUTTONS: tuple[UpSnapButtonDescription, ...] = (
         key="reboot",
         action=ACTION_REBOOT,
         device_class=ButtonDeviceClass.RESTART,
+        entity_category=EntityCategory.CONFIG,
     ),
     UpSnapButtonDescription(
         key="sleep",
         translation_key="sleep",
         action=ACTION_SLEEP,
+        entity_category=EntityCategory.CONFIG,
         # Sleep needs Sleep-on-LAN to be set up for the device in UpSnap.
         exists_fn=lambda device: device.sol_enabled,
     ),

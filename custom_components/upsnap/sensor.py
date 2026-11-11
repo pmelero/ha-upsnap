@@ -7,7 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import POWER_STATES
-from .coordinator import UpSnapConfigEntry
+from .coordinator import UpSnapConfigEntry, UpSnapCoordinator
 from .entity import UpSnapEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 0
@@ -33,7 +33,7 @@ class UpSnapPowerStateSensor(UpSnapEntity, SensorEntity):
     _attr_options = POWER_STATES
     _attr_translation_key = "power_state"
 
-    def __init__(self, coordinator, device_id: str) -> None:
+    def __init__(self, coordinator: UpSnapCoordinator, device_id: str) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, device_id, "power_state")
 

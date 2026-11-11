@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import ACTION_SHUTDOWN, ACTION_WAKE
-from .coordinator import UpSnapConfigEntry
+from .coordinator import UpSnapConfigEntry, UpSnapCoordinator
 from .entity import UpSnapEntity, async_add_device_entities
 
 PARALLEL_UPDATES = 0
@@ -38,7 +38,7 @@ class UpSnapPowerSwitch(UpSnapEntity, SwitchEntity):
     _attr_name = None
     _attr_translation_key = "power"
 
-    def __init__(self, coordinator, device_id: str) -> None:
+    def __init__(self, coordinator: UpSnapCoordinator, device_id: str) -> None:
         """Initialize the switch."""
         super().__init__(coordinator, device_id, "power")
 

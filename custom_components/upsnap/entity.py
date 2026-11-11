@@ -5,11 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 
 from homeassistant.core import callback
-from homeassistant.helpers.device_registry import (
-    CONNECTION_NETWORK_MAC,
-    DeviceInfo,
-    format_mac,
-)
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -34,7 +31,7 @@ class UpSnapEntity(CoordinatorEntity[UpSnapCoordinator]):
         device = coordinator.data[device_id]
         connections: set[tuple[str, str]] = set()
         if device.mac:
-            connections.add((CONNECTION_NETWORK_MAC, format_mac(device.mac)))
+            connections.add((CONNECTION_NETWORK_MAC, dr.format_mac(device.mac)))
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, device_id)},
             connections=connections,
@@ -43,11 +40,6 @@ class UpSnapEntity(CoordinatorEntity[UpSnapCoordinator]):
             model="Wake-on-LAN device",
             configuration_url=coordinator.client.url,
         )
-
-    @property
-    def device(self) -> UpSnapDevice | None:
-        """Return the latest data of this device."""
-        return self.coordinator.data.get(self._device_id)
 
     @property
     def available(self) -> bool:
@@ -66,6 +58,18 @@ def async_add_device_entities(
 
     @callback
     def _add_new_devices() -> None:
+        # Forget devices the coordinator removed from the registry (their entities
+        # are gone too), so they get new entities if they come back.
+        registered = {
+            identifier
+            for device_entry in dr.async_entries_for_config_entry(
+                dr.async_get(coordinator.hass), entry.entry_id
+            )
+            for domain, identifier in device_entry.identifiers
+            if domain == DOMAIN
+        }
+        known.intersection_update(coordinator.data.keys() | registered)
+
         new = [
             device
             for device_id, device in coordinator.data.items()

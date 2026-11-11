@@ -6,12 +6,15 @@ import asyncio
 import base64
 from dataclasses import dataclass
 import json
+import logging
 import time
 from typing import Any
 
 import aiohttp
 
 from .const import ACTION_SLEEP, ACTIONS
+
+_LOGGER = logging.getLogger(__name__)
 
 # Only ask for the fields we use. UpSnap device records also contain the
 # Wake-on-LAN and Sleep-on-LAN passwords and the shutdown command, which must
@@ -263,6 +266,8 @@ class UpSnapClient:
                     data: Any = await resp.json()
                 else:
                     data = await resp.text()
+                # Never log bodies or headers: they contain tokens and passwords.
+                _LOGGER.debug("%s %s: HTTP %s", method, path, resp.status)
                 return resp.status, data
         except (aiohttp.ClientError, TimeoutError) as err:
             raise UpSnapConnectionError(

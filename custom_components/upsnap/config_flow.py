@@ -30,14 +30,10 @@ from homeassistant.helpers.selector import (
 from .api import UpSnapAuthError, UpSnapClient, UpSnapConnectionError, UpSnapError
 from .const import (
     CONF_PENDING_TIMEOUT,
-    CONF_SCAN_INTERVAL,
     DEFAULT_PENDING_TIMEOUT,
-    DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     MAX_PENDING_TIMEOUT,
-    MAX_SCAN_INTERVAL,
     MIN_PENDING_TIMEOUT,
-    MIN_SCAN_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,6 +50,18 @@ USER_SCHEMA = vol.Schema(
         vol.Optional(CONF_VERIFY_SSL, default=True): bool,
     }
 )
+
+
+def entry_title(url: str) -> str:
+    """Return the title of the config entry for an UpSnap URL."""
+    return f"UpSnap ({urlparse(url).hostname or url})"
+
+
+def without_password(data: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """Return form values to suggest again, never including the password."""
+    if data is None:
+        return None
+    return {key: value for key, value in data.items() if key != CONF_PASSWORD}
 
 
 def normalize_url(url: str) -> str:
@@ -105,14 +113,15 @@ class UpSnapConfigFlow(ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
             errors = await validate_input(self.hass, user_input)
             if not errors:
-                host = urlparse(user_input[CONF_URL]).hostname or user_input[CONF_URL]
                 return self.async_create_entry(
-                    title=f"UpSnap ({host})", data=user_input
+                    title=entry_title(user_input[CONF_URL]), data=user_input
                 )
 
         return self.async_show_form(
             step_id="user",
-            data_schema=self.add_suggested_values_to_schema(USER_SCHEMA, user_input),
+            data_schema=self.add_suggested_values_to_schema(
+                USER_SCHEMA, without_password(user_input)
+            ),
             errors=errors,
         )
 
@@ -146,6 +155,35 @@ class UpSnapConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"url": entry.data[CONF_URL]},
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Change the URL or the credentials of an existing entry."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            user_input[CONF_URL] = normalize_url(user_input[CONF_URL])
+            unique_id = user_input[CONF_URL].lower()
+            if unique_id != entry.unique_id:
+                await self.async_set_unique_id(unique_id)
+                self._abort_if_unique_id_configured()
+            errors = await validate_input(self.hass, user_input)
+            if not errors:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    unique_id=unique_id,
+                    title=entry_title(user_input[CONF_URL]),
+                    data_updates=user_input,
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=self.add_suggested_values_to_schema(
+                USER_SCHEMA, without_password(user_input or dict(entry.data))
+            ),
+            errors=errors,
+        )
+
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> UpSnapOptionsFlow:
@@ -154,7 +192,7 @@ class UpSnapConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class UpSnapOptionsFlow(OptionsFlow):
-    """Polling interval and how long to wait for power actions."""
+    """How long to wait for power actions."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -168,18 +206,6 @@ class UpSnapOptionsFlow(OptionsFlow):
         options = self.config_entry.options
         schema = vol.Schema(
             {
-                vol.Required(
-                    CONF_SCAN_INTERVAL,
-                    default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                ): NumberSelector(
-                    NumberSelectorConfig(
-                        min=MIN_SCAN_INTERVAL,
-                        max=MAX_SCAN_INTERVAL,
-                        step=1,
-                        unit_of_measurement="s",
-                        mode=NumberSelectorMode.BOX,
-                    )
-                ),
                 vol.Required(
                     CONF_PENDING_TIMEOUT,
                     default=options.get(CONF_PENDING_TIMEOUT, DEFAULT_PENDING_TIMEOUT),

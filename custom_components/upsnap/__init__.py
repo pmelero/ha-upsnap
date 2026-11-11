@@ -10,12 +10,12 @@ from homeassistant.const import (
     Platform,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import UpSnapClient
 from .const import DOMAIN
-from .coordinator import UpSnapConfigEntry, UpSnapCoordinator
+from .coordinator import UpSnapConfigEntry, UpSnapCoordinator, no_devices_issue_id
 
 PLATFORMS: list[Platform] = [Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
 
@@ -42,6 +42,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UpSnapConfigEntry) -> bo
 
 async def async_unload_entry(hass: HomeAssistant, entry: UpSnapConfigEntry) -> bool:
     """Unload a config entry."""
+    ir.async_delete_issue(hass, DOMAIN, no_devices_issue_id(entry))
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 
