@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in the UpSnap integration does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect and what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.11.0
+    validations:
+      required: true
+  - type: input
+    id: upsnap_version
+    attributes:
+      label: UpSnap version
+      placeholder: "4.6.1"
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Settings → Devices & services → UpSnap → ⋮ → Download diagnostics, then drag
+        the file here. Credentials and addresses are removed from it.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from the Home Assistant log (enable debug logging for the integration if you can).
+      render: text

@@ -1,0 +1,5 @@
+# Test kit for the oldest Home Assistant version in hacs.json (2024.12.5).
+pytest-homeassistant-custom-component==0.13.195
+# The pycares of that time: newer versions start a shutdown thread that this test
+# kit's cleanup check rejects.
+pycares==4.5.0

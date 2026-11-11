@@ -10,3 +10,17 @@ ignore = ["D203", "D213", "PLR0912", "PLR0913", "PLR2004", "RUF012"]
 force-sort-within-sections = true
 known-first-party = ["homeassistant"]
 combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D103", "PLR0913"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["custom_components.upsnap"]
+
+[tool.coverage.report]
+show_missing = true
