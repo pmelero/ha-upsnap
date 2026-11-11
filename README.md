@@ -49,7 +49,8 @@ shutdown) show up in Home Assistant too.
 
 ## Requirements
 
-- UpSnap 4.x or 5.x (tested with 4.x).
+- UpSnap 4.x or 5.x (tested with 4.6; API checked against 5.7.3).
+- **Lazy ping** turned off in UpSnap's settings (see *Known limitations*).
 - Home Assistant 2024.12 or newer (the integration icon needs 2026.3 or newer).
 
 ## Installation
@@ -205,6 +206,9 @@ styles:
 
 - Whether a device is on is decided by UpSnap's ping. A device that does not answer
   ping shows as off; set a custom ping command for it in UpSnap.
+- With **Lazy ping** enabled, UpSnap only pings while someone has its web UI open and
+  marks devices with a shutdown command as off when the last one closes it. Home
+  Assistant then sees those devices as off. Turn Lazy ping off in UpSnap's settings.
 - Turning a device off needs a shutdown command configured for it in UpSnap.
 - Updates come by polling, not push: changes appear after up to one polling interval.
 - If Home Assistant restarts while UpSnap is busy with a device, the direction
@@ -218,6 +222,8 @@ styles:
   "UpSnap user cannot see any device"** (later, in Settings → Repairs): give the
   UpSnap user the Read permission on the devices. The devices are kept meanwhile.
 - **"Not allowed to power" errors**: give it the Power permission.
+- **Devices show as off although they are on**: turn off **Lazy ping** in UpSnap's
+  settings.
 - **A device stays *turning on***: check that Wake-on-LAN works from the UpSnap web UI
   and that the device answers ping.
 - **A device does not turn off**: check its shutdown command in UpSnap; UpSnap runs it
